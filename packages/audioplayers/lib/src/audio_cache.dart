@@ -162,12 +162,14 @@ class AudioCache {
       await player.setReleaseMode(ReleaseMode.STOP);
     }
     await player.play(
-      uri.toString().replaceFirst(
-            uri.toString().substring(
-                  uri.toString().lastIndexOf('/'),
-                ),
-            '/$fileName',
-          ),
+      Platform.isAndroid
+          ? uri.toString()
+          : uri.toString().replaceFirst(
+                uri.toString().substring(
+                      uri.toString().lastIndexOf('/'),
+                    ),
+                '/$fileName',
+              ),
       volume: volume,
       respectSilence: isNotification ?? respectSilence,
       stayAwake: stayAwake,
