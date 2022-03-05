@@ -161,6 +161,14 @@ class AudioCache {
     if (fixedPlayer != null) {
       await player.setReleaseMode(ReleaseMode.STOP);
     }
+    debugPrint('isAndroid ${Platform.isAndroid}');
+    debugPrint('uri.toString() ${uri.toString()}');
+    debugPrint('uri.toString() ${uri.toString().replaceFirst(
+          uri.toString().substring(
+                uri.toString().lastIndexOf('/'),
+              ),
+          '/$fileName',
+        )}');
     await player.play(
       Platform.isAndroid
           ? uri.toString()
@@ -225,7 +233,14 @@ class AudioCache {
     final player = _player(mode);
     await player.setReleaseMode(ReleaseMode.LOOP);
     await player.play(
-      url.toString(),
+      Platform.isAndroid
+          ? url.toString()
+          : url.toString().replaceFirst(
+                url.toString().substring(
+                      url.toString().lastIndexOf('/'),
+                    ),
+                '/$fileName',
+              ),
       volume: volume,
       respectSilence: isNotification ?? respectSilence,
       stayAwake: stayAwake,
