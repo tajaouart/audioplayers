@@ -218,7 +218,7 @@ class AudioPlayer {
       uri.toString().substring(
             uri.toString().lastIndexOf('/'),
           ),
-      '/$path',
+      '/${path.contains('/') ? path.substring(path.lastIndexOf('/')) : path}',
     );
 
     return _platform.setSourceUrl(playerId, url, isLocal: true);
