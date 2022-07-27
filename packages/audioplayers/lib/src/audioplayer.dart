@@ -213,8 +213,15 @@ class AudioPlayer {
   /// The resources will start being fetched or buffered as soon as you call
   /// this method.
   Future<void> setSourceAsset(String path) async {
-    final url = await audioCache.load(path);
-    return _platform.setSourceUrl(playerId, url.path, isLocal: true);
+    final uri = await audioCache.load(path);
+    final url = uri.path.replaceFirst(
+      uri.toString().substring(
+            uri.toString().lastIndexOf('/'),
+          ),
+      '/$path',
+    );
+
+    return _platform.setSourceUrl(playerId, url, isLocal: true);
   }
 
   Future<void> setSourceBytes(Uint8List bytes) {
