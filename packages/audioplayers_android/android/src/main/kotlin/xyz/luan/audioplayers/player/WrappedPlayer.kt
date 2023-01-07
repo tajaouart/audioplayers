@@ -24,6 +24,7 @@ class WrappedPlayer internal constructor(
     var source: Source? = null
         set(value) {
             if (field != value) {
+                field = value
                 if (value != null) {
                     val player = getOrCreatePlayer()
                     player.setSource(value)
@@ -34,8 +35,6 @@ class WrappedPlayer internal constructor(
                     playing = false
                     player?.release()
                 }
-
-                field = value
             }
         }
 
@@ -77,10 +76,12 @@ class WrappedPlayer internal constructor(
 
                 // if the player exists, we need to re-create it from scratch;
                 // this will probably cause music to pause for a second
-                val player = player ?: return
-                shouldSeekTo = maybeGetCurrentPosition()
-                player.release()
-                this.player = createPlayer()
+                player?.let {
+                    shouldSeekTo = maybeGetCurrentPosition()
+                    prepared = false
+                    it.release()
+                }
+                initPlayer()
             }
         }
 
@@ -158,12 +159,11 @@ class WrappedPlayer internal constructor(
     }
 
     private fun actuallyPlay() {
-        if (!playing) {
+        if (!playing && !released) {
             val currentPlayer = player
             playing = true
-            if (released || currentPlayer == null) {
-                released = false
-                player = createPlayer()
+            if (currentPlayer == null) {
+                initPlayer()
             } else if (prepared) {
                 currentPlayer.start()
                 ref.handleIsPlaying()
@@ -177,10 +177,16 @@ class WrappedPlayer internal constructor(
             return
         }
         if (releaseMode != ReleaseMode.RELEASE) {
-            if (playing) {
-                playing = false
-                player?.pause()
-                player?.seekTo(0)
+            pause()
+            if (prepared) {
+                if (player?.isLiveStream() == true) {
+                    player?.stop()
+                    prepared = false
+                    player?.prepare()
+                } else {
+                    // MediaPlayer does not allow to call player.seekTo after calling player.stop
+                    seek(0)
+                }
             }
         } else {
             release()
@@ -195,27 +201,30 @@ class WrappedPlayer internal constructor(
         if (playing) {
             player?.stop()
         }
-        player?.release()
+
+        // Setting source to null will reset released, prepared and playing
+        // and also calls player.release()
+        source = null
         player = null
-        prepared = false
-        released = true
-        playing = false
     }
 
     fun pause() {
         if (playing) {
             playing = false
-            player?.pause()
+            if (prepared) {
+                player?.pause()
+            }
         }
     }
 
     // seek operations cannot be called until after
     // the player is ready.
     fun seek(position: Int) {
-        if (prepared) {
+        shouldSeekTo = if (prepared && player?.isLiveStream() != true) {
             player?.seekTo(position)
+            -1
         } else {
-            shouldSeekTo = position
+            position
         }
     }
 
@@ -229,9 +238,8 @@ class WrappedPlayer internal constructor(
             player?.start()
             ref.handleIsPlaying()
         }
-        if (shouldSeekTo >= 0) {
+        if (shouldSeekTo >= 0 && player?.isLiveStream() != true) {
             player?.seekTo(shouldSeekTo)
-            shouldSeekTo = -1
         }
     }
 
@@ -272,18 +280,27 @@ class WrappedPlayer internal constructor(
      * Internal logic. Private methods
      */
 
+    /**
+     * Create new player
+     */
     private fun createPlayer(): Player {
-        val player = when (playerMode) {
+        return when (playerMode) {
             MEDIA_PLAYER -> MediaPlayerPlayer(this)
             LOW_LATENCY -> SoundPoolPlayer(this)
         }
+    }
 
+    /**
+     * Create new player, assign and configure source
+     */
+    private fun initPlayer() {
+        val player = createPlayer()
+        // Need to set player before calling prepare, as onPrepared may is called before player is assigned
+        this.player = player
         source?.let {
             player.setSource(it)
             player.configAndPrepare()
         }
-
-        return player
     }
 
     private fun Player.configAndPrepare() {

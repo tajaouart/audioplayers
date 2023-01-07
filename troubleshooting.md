@@ -8,8 +8,8 @@ You can check a list of supported formats below:
 
 - [Android](https://developer.android.com/guide/topics/media/media-formats.html)
 - [iOS/macOS](https://www.techotopia.com/index.php/Playing_Audio_on_iOS_8_using_AVAudioPlayer#Supported_Audio_Formats)
-- web: audio formats supported by the browser you are using ([more details](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API))
-- Windows: unclear at this point (if you can help with official documentation here please update this doc!)
+- Web: audio formats supported by the browser you are using ([more details](https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Audio_codecs))
+- [Windows](https://learn.microsoft.com/en-us/windows/win32/medfound/supported-media-formats-in-media-foundation)
 - Linux: List of defined [audio types](https://gstreamer.freedesktop.org/documentation/plugin-development/advanced/media-types.html?gi-language=c#table-of-audio-types) and their according [Plugins](https://gstreamer.freedesktop.org/documentation/plugins_doc.html?gi-language=c)
 
 ## Unsafe HTTP when playing remote URLs
@@ -56,7 +56,7 @@ The remote URL must be accessible and not be a redirect. If it's not an audio fi
 
 **Warning**: If you are having any sort of build issues, you must read this first.
 
-Our [CI](https://github.com/luanpotter/audioplayers/blob/master/.github/workflows/build.yaml) builds our example app using audioplayers for Android, iOS, Linux, macOS, Windows, and web. So if the build is passing, any build errors (from android/ios sdk, gradle, java, kotlin, cocoa pods, swift, flutter, etc) is not a global issue and likely is something on your setup.
+Our [CI](https://github.com/bluefireteam/audioplayers/blob/master/.github/workflows/build.yml) builds our example app using audioplayers for Android, iOS, Linux, macOS, Windows, and web. So if the build is passing, any build errors (from android/ios sdk, gradle, java, kotlin, cocoa pods, swift, flutter, etc) is not a global issue and likely is something on your setup.
 
 Before opening an issue, you **must** try these steps:
 
@@ -91,7 +91,7 @@ Or on XCode you can add it as a capability; more details [here](https://develope
 
 ## Audio Stream Issues
 
-One of the know reasons for streams not playing is that the stream is being gziped by the server, as described [here](https://github.com/luanpotter/audioplayers/issues/183).
+One of the know reasons for streams not playing is that the stream is being gziped by the server, as described [here](https://github.com/bluefireteam/audioplayers/issues/183).
 
 ## Gapless Looping
 

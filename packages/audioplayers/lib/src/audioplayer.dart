@@ -1,4 +1,7 @@
 import 'dart:async';
+
+// TODO(gustl22): remove when upgrading min Flutter version to >=3.3.0
+// ignore: unnecessary_import
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -27,12 +30,18 @@ class AudioPlayer {
 
   PlayerState get state => _playerState;
 
+  Source? _source;
+
+  Source? get source => _source;
+
   set state(PlayerState state) {
     if (!_playerStateController.isClosed) {
       _playerStateController.add(state);
     }
     _playerState = state;
   }
+
+  late StreamSubscription _onPlayerCompleteStreamSubscription;
 
   final StreamController<PlayerState> _playerStateController =
       StreamController<PlayerState>.broadcast();
@@ -87,11 +96,19 @@ class AudioPlayer {
   ReleaseMode get releaseMode => _releaseMode;
 
   /// Creates a new instance and assigns an unique id to it.
-  AudioPlayer({String? playerId}) : playerId = playerId ?? _uuid.v4();
+  AudioPlayer({String? playerId}) : playerId = playerId ?? _uuid.v4() {
+    _onPlayerCompleteStreamSubscription = onPlayerComplete.listen((_) {
+      state = PlayerState.completed;
+      if (releaseMode == ReleaseMode.release) {
+        _source = null;
+      }
+    });
+  }
 
   Future<void> play(
     Source source, {
     double? volume,
+    double? balance,
     AudioContext? ctx,
     Duration? position,
     PlayerMode? mode,
@@ -101,6 +118,9 @@ class AudioPlayer {
     }
     if (volume != null) {
       await setVolume(volume);
+    }
+    if (balance != null) {
+      await setBalance(balance);
     }
     if (ctx != null) {
       await setAudioContext(ctx);
@@ -152,11 +172,21 @@ class AudioPlayer {
   Future<void> release() async {
     await _platform.release(playerId);
     state = PlayerState.stopped;
+    _source = null;
   }
 
   /// Moves the cursor to the desired position.
   Future<void> seek(Duration position) {
     return _platform.seek(playerId, position);
+  }
+
+  /// Sets the stereo balance.
+  ///
+  /// -1 - The left channel is at full volume; the right channel is silent.
+  ///  1 - The right channel is at full volume; the left channel is silent.
+  ///  0 - Both channels are at the same volume.
+  Future<void> setBalance(double balance) {
+    return _platform.setBalance(playerId, balance);
   }
 
   /// Sets the volume (amplitude).
@@ -196,6 +226,7 @@ class AudioPlayer {
   /// The resources will start being fetched or buffered as soon as you call
   /// this method.
   Future<void> setSourceUrl(String url) {
+    _source = UrlSource(url);
     return _platform.setSourceUrl(playerId, url, isLocal: false);
   }
 
@@ -204,6 +235,7 @@ class AudioPlayer {
   /// The resources will start being fetched or buffered as soon as you call
   /// this method.
   Future<void> setSourceDeviceFile(String path) {
+    _source = DeviceFileSource(path);
     return _platform.setSourceUrl(playerId, path, isLocal: true);
   }
 
@@ -213,18 +245,19 @@ class AudioPlayer {
   /// The resources will start being fetched or buffered as soon as you call
   /// this method.
   Future<void> setSourceAsset(String path) async {
-    final uri = await audioCache.load(path);
-    final url = uri.path.replaceFirst(
-      uri.toString().substring(
-            uri.toString().lastIndexOf('/'),
-          ),
-      '/${path.contains('/') ? path.substring(path.lastIndexOf('/')) : path}',
-    );
+    _source = AssetSource(path);
+    final url = await audioCache.load(path);
 
-    return _platform.setSourceUrl(playerId, url, isLocal: true);
+    // reset new file after it was lost because of ascii issue in path
+    final fileName = path.substring(path.lastIndexOf('/'));
+    final dir = url.path.substring(0, url.path.lastIndexOf('/'));
+    final newPath = dir + fileName;
+
+    return _platform.setSourceUrl(playerId, newPath, isLocal: true);
   }
 
   Future<void> setSourceBytes(Uint8List bytes) {
+    _source = BytesSource(bytes);
     return _platform.setSourceBytes(playerId, bytes);
   }
 
@@ -258,10 +291,13 @@ class AudioPlayer {
     // First stop and release all native resources.
     await release();
 
-    final futures = <Future>[];
-    if (!_playerStateController.isClosed) {
-      futures.add(_playerStateController.close());
-    }
+    final futures = <Future>[
+      if (!_playerStateController.isClosed) _playerStateController.close(),
+      _onPlayerCompleteStreamSubscription.cancel()
+    ];
+
+    _source = null;
+
     await Future.wait<dynamic>(futures);
   }
 }

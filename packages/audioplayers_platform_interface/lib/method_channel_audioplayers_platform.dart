@@ -1,4 +1,7 @@
 import 'dart:async';
+
+// TODO(gustl22): remove when upgrading min Flutter version to >=3.3.0
+// ignore: unnecessary_import
 import 'dart:typed_data';
 
 import 'package:audioplayers_platform_interface/api/audio_context_config.dart';
@@ -66,6 +69,18 @@ class MethodChannelAudioplayersPlatform extends AudioplayersPlatform
       'setAudioContext',
       playerId,
       context.toJson(),
+    );
+  }
+
+  @override
+  Future<void> setBalance(
+    String playerId,
+    double balance,
+  ) {
+    return _call(
+      'setBalance',
+      playerId,
+      <String, dynamic>{'balance': balance},
     );
   }
 
@@ -150,7 +165,7 @@ class MethodChannelAudioplayersPlatform extends AudioplayersPlatform
     }
   }
 
-  Future<void> _doHandlePlatformCall(MethodCall call) async {
+  void _doHandlePlatformCall(MethodCall call) {
     final playerId = call.getString('playerId');
 
     switch (call.method) {
@@ -171,7 +186,8 @@ class MethodChannelAudioplayersPlatform extends AudioplayersPlatform
         emitSeekComplete(playerId);
         break;
       case 'audio.onError':
-        throw call.getString('value');
+        _logger.error('Unexpected platform error: ${call.getString('value')}');
+        break;
       default:
         _logger.error('Unknown method ${call.method} ');
     }

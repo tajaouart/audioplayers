@@ -1,3 +1,30 @@
+## 1.2.0
+
+> Note: This release has breaking changes.
+
+ - **FIX**: Duration precision on Windows ([#1342](https://github.com/bluefireteam/audioplayers/issues/1342)). ([3cda1a65](https://github.com/bluefireteam/audioplayers/commit/3cda1a65dc0425c332ed2eb3619cd88531f0ea49))
+ - **FIX**: infinity / nan on getDuration ([#1298](https://github.com/bluefireteam/audioplayers/issues/1298)). ([a4474dcf](https://github.com/bluefireteam/audioplayers/commit/a4474dcf5e14fbd74db8b4f19223b9bfa40ed5f5))
+ - **FEAT**: upgrade flutter to v3.0.0 and dart 2.17 to support "Super initializers" ([#1355](https://github.com/bluefireteam/audioplayers/issues/1355)). ([4af417b4](https://github.com/bluefireteam/audioplayers/commit/4af417b4c91ed5c22d6c48e05080c3018ccaee42))
+ - **FEAT**: local test server ([#1354](https://github.com/bluefireteam/audioplayers/issues/1354)). ([06be429a](https://github.com/bluefireteam/audioplayers/commit/06be429a0078456a989b9afc3abc68164c4abaab))
+ - **FEAT**: get current source ([#1350](https://github.com/bluefireteam/audioplayers/issues/1350)). ([7a10be38](https://github.com/bluefireteam/audioplayers/commit/7a10be38ec6613c8ef45bb33d1e81f11bb5988f9))
+ - **FEAT**: log path and url of sources ([#1334](https://github.com/bluefireteam/audioplayers/issues/1334)). ([8a13f96d](https://github.com/bluefireteam/audioplayers/commit/8a13f96dbb14be0d1d80577816246109c42b7983))
+ - **FEAT**: add setBalance ([#58](https://github.com/bluefireteam/audioplayers/issues/58)) ([#1282](https://github.com/bluefireteam/audioplayers/issues/1282)). ([782fc9df](https://github.com/bluefireteam/audioplayers/commit/782fc9dff24a2ab9681496fd7c4c8fed451eac35))
+ - **DOCS**: Fix repos and homepages on pubspecs ([#1349](https://github.com/bluefireteam/audioplayers/issues/1349)). ([0bdde4d9](https://github.com/bluefireteam/audioplayers/commit/0bdde4d9f8f62487cdcfe96221216eba03b31060))
+ - **BREAKING** **FIX**: Cache should take key to be properly cleared ([#1347](https://github.com/bluefireteam/audioplayers/issues/1347)). ([1a410bba](https://github.com/bluefireteam/audioplayers/commit/1a410bba578af506637b026bb2c4ace03a161a69))
+
+## 1.1.1
+
+ - **FIX**: infinity / nan on getDuration ([#1298](https://github.com/bluefireteam/audioplayers/issues/1298)). ([a4474dcf](https://github.com/bluefireteam/audioplayers/commit/a4474dcf5e14fbd74db8b4f19223b9bfa40ed5f5))
+
+## 1.1.0
+
+ - **FIX**: player state not being updated to completed (#1257). ([70a37afb](https://github.com/bluefireteam/audioplayers/commit/70a37afb6ce4fbb8b8c680ca9b6804b005012446))
+ - **FIX**: lowLatency bugs (closes #1176, closes #1193, closes #1165) (#1272). ([541578cc](https://github.com/bluefireteam/audioplayers/commit/541578cc50f3856c23c393faa1a71380b3b49222))
+ - **FIX**: ios/macos no longer start audio when calling only setSourceUrl (#1206). ([c0e97f04](https://github.com/bluefireteam/audioplayers/commit/c0e97f04fb05fb109830d6363f5c44dccbd327b4))
+ - **FEAT**: improve example (#1267). ([a8154da1](https://github.com/bluefireteam/audioplayers/commit/a8154da1cc6fdec80d80fa538d65cb491a33db78))
+ - **FEAT**: Platform integration tests 🤖 (#1128). ([b0c84aab](https://github.com/bluefireteam/audioplayers/commit/b0c84aabea8af28f693941c1b3bf2b1fa1048833))
+ - **DOCS**: Remove 11-month old outdated doc file (#1180). ([bae43cb1](https://github.com/bluefireteam/audioplayers/commit/bae43cb10a27eff23ebaf2a6ac796fd61039f359))
+
 ## 1.0.1
 
  - **FIX**: Make sure onComplete resets the position even when not looping (#1175). ([6e6005ac](https://github.com/bluefireteam/audioplayers/commit/6e6005ac98765aeeea62208b58a6cc6d0cb4b084))

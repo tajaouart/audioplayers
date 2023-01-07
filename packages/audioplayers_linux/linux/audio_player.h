@@ -37,6 +37,8 @@ public:
 
     void Dispose();
 
+    void SetBalance(float balance);
+
     void SetLooping(bool isLooping);
 
     void SetVolume(double volume);
@@ -53,9 +55,11 @@ private:
     // Gst members
     GstElement *playbin;
     GstElement *source;
+    GstElement *panorama;
     GstBus *bus;
 
     bool _isInitialized = false;
+    bool _isPlaying = false;
     bool _isLooping = false;
     bool _isSeekCompleted = true;
     double _playbackRate = 1.0;

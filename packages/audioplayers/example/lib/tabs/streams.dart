@@ -5,13 +5,12 @@ import 'package:audioplayers_example/components/btn.dart';
 import 'package:audioplayers_example/components/pad.dart';
 import 'package:audioplayers_example/components/player_widget.dart';
 import 'package:audioplayers_example/components/tab_wrapper.dart';
-import 'package:audioplayers_example/utils.dart';
 import 'package:flutter/material.dart';
 
 class StreamsTab extends StatefulWidget {
   final AudioPlayer player;
 
-  const StreamsTab({Key? key, required this.player}) : super(key: key);
+  const StreamsTab({super.key, required this.player});
 
   @override
   State<StreamsTab> createState() => _StreamsTabState();
@@ -20,10 +19,12 @@ class StreamsTab extends StatefulWidget {
 class _StreamsTabState extends State<StreamsTab>
     with AutomaticKeepAliveClientMixin<StreamsTab> {
   Duration? position, duration;
+  PlayerState? state;
+  Source? source;
   late List<StreamSubscription> streams;
 
   Duration? streamDuration, streamPosition;
-  PlayerState? state;
+  PlayerState? streamState;
 
   @override
   void initState() {
@@ -32,12 +33,19 @@ class _StreamsTabState extends State<StreamsTab>
       widget.player.onDurationChanged
           .listen((it) => setState(() => streamDuration = it)),
       widget.player.onPlayerStateChanged
-          .listen((it) => setState(() => state = it)),
+          .listen((it) => setState(() => streamState = it)),
       widget.player.onPositionChanged
           .listen((it) => setState(() => streamPosition = it)),
-      widget.player.onPlayerComplete.listen((it) => toast('Player complete!')),
-      widget.player.onSeekComplete.listen((it) => toast('Seek complete!')),
     ];
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    // Subscriptions only can be closed asynchronously,
+    // therefore events can occur after widget has been disposed.
+    if (mounted) {
+      super.setState(fn);
+    }
   }
 
   @override
@@ -54,6 +62,14 @@ class _StreamsTabState extends State<StreamsTab>
   Future<void> getDuration() async {
     final duration = await widget.player.getDuration();
     setState(() => this.duration = duration);
+  }
+
+  Future<void> getPlayerState() async {
+    setState(() => state = widget.player.state);
+  }
+
+  Future<void> getSource() async {
+    setState(() => source = widget.player.source);
   }
 
   @override
@@ -89,6 +105,34 @@ class _StreamsTabState extends State<StreamsTab>
             ),
           ],
         ),
+        Row(
+          children: [
+            Btn(
+              key: const Key('getPlayerState'),
+              txt: 'Get State',
+              onPressed: getPlayerState,
+            ),
+            const Pad(width: 8.0),
+            Text(
+              state?.toString() ?? '-',
+              key: const Key('playerStateText'),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Btn(
+              key: const Key('getSource'),
+              txt: 'Get Source',
+              onPressed: getSource,
+            ),
+            const Pad(width: 8.0),
+            Text(
+              source?.toString() ?? '-',
+              key: const Key('sourceText'),
+            ),
+          ],
+        ),
         const Divider(color: Colors.black),
         const Text('Streams'),
         Text(
@@ -100,7 +144,7 @@ class _StreamsTabState extends State<StreamsTab>
           key: const Key('onPositionText'),
         ),
         Text(
-          'Stream State: $state',
+          'Stream State: $streamState',
           key: const Key('onStateText'),
         ),
         const Divider(color: Colors.black),

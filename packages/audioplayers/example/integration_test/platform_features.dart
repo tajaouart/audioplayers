@@ -8,43 +8,48 @@ class PlatformFeatures {
     hasBytesSource: false,
     hasPlaylistSourceType: false,
     hasLowLatency: false,
-    hasReleaseMode: false,
-    hasSeek: false,
+    hasReleaseModeRelease: false,
     hasDuckAudio: false,
     hasRespectSilence: false,
     hasStayAwake: false,
     hasRecordingActive: false,
     hasPlayingRoute: false,
-    hasDurationEvent: false,
-    hasCompletionEvent: false,
     hasErrorEvent: false,
   );
 
   static const androidPlatformFeatures = PlatformFeatures(
     hasRecordingActive: false,
+    hasBalance: false,
   );
 
   static const iosPlatformFeatures = PlatformFeatures(
     hasBytesSource: false,
     hasPlaylistSourceType: false,
+    hasReleaseModeRelease: false,
     hasLowLatency: false,
     hasDuckAudio: false,
+    hasBalance: false,
   );
 
   static const macPlatformFeatures = PlatformFeatures(
     hasBytesSource: false,
     hasPlaylistSourceType: false,
     hasLowLatency: false,
+    hasReleaseModeRelease: false,
     hasDuckAudio: false,
     hasRespectSilence: false,
     hasStayAwake: false,
     hasRecordingActive: false,
     hasPlayingRoute: false,
+    hasBalance: false,
   );
 
   static const linuxPlatformFeatures = PlatformFeatures(
     hasBytesSource: false,
     hasLowLatency: false,
+    hasReleaseModeRelease: false,
+    // MP3 duration is estimated: https://bugzilla.gnome.org/show_bug.cgi?id=726144
+    // Use GstDiscoverer to get duration before playing: https://gstreamer.freedesktop.org/documentation/pbutils/gstdiscoverer.html?gi-language=c
     hasMp3Duration: false,
     hasDuckAudio: false,
     hasRespectSilence: false,
@@ -55,7 +60,9 @@ class PlatformFeatures {
 
   static const windowsPlatformFeatures = PlatformFeatures(
     hasBytesSource: false,
+    hasPlaylistSourceType: false,
     hasLowLatency: false,
+    hasReleaseModeRelease: false,
     hasDuckAudio: false,
     hasRespectSilence: false,
     hasStayAwake: false,
@@ -69,13 +76,15 @@ class PlatformFeatures {
 
   final bool hasPlaylistSourceType;
 
-  final bool hasLowLatency; // Not yet tested
-  final bool hasReleaseMode; // Not yet tested
-  final bool hasVolume; // Not yet tested
-  final bool hasSeek; // Not yet tested
-  final bool hasMp3Duration; // Not yet tested
+  final bool hasLowLatency;
+  final bool hasReleaseModeRelease;
+  final bool hasReleaseModeLoop;
+  final bool hasVolume;
+  final bool hasBalance;
+  final bool hasSeek;
+  final bool hasMp3Duration;
 
-  final bool hasPlaybackRate; // Not yet tested
+  final bool hasPlaybackRate;
   final bool hasDuckAudio; // Not yet tested
   final bool hasRespectSilence; // Not yet tested
   final bool hasStayAwake; // Not yet tested
@@ -84,7 +93,7 @@ class PlatformFeatures {
 
   final bool hasDurationEvent;
   final bool hasPositionEvent;
-  final bool hasCompletionEvent; // Not yet tested
+  final bool hasPlayerStateEvent;
   final bool hasErrorEvent; // Not yet tested
 
   const PlatformFeatures({
@@ -93,9 +102,11 @@ class PlatformFeatures {
     this.hasBytesSource = true,
     this.hasPlaylistSourceType = true,
     this.hasLowLatency = true,
-    this.hasReleaseMode = true,
+    this.hasReleaseModeRelease = true,
+    this.hasReleaseModeLoop = true,
     this.hasMp3Duration = true,
     this.hasVolume = true,
+    this.hasBalance = true,
     this.hasSeek = true,
     this.hasPlaybackRate = true,
     this.hasDuckAudio = true,
@@ -105,7 +116,7 @@ class PlatformFeatures {
     this.hasPlayingRoute = true,
     this.hasDurationEvent = true,
     this.hasPositionEvent = true,
-    this.hasCompletionEvent = true,
+    this.hasPlayerStateEvent = true,
     this.hasErrorEvent = true,
   });
 

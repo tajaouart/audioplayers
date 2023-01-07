@@ -13,6 +13,25 @@ AudioPlayer::AudioPlayer(std::string playerId, FlMethodChannel *channel)
         return;
     }
 
+    // Setup stereo balance controller
+    panorama = gst_element_factory_make("audiopanorama", "audiopanorama");
+    if (panorama) {
+        GstElement *audiosink = gst_element_factory_make("autoaudiosink", "audio_sink");
+
+        GstElement *audiobin = gst_bin_new("audiobin");
+        gst_bin_add_many(GST_BIN(audiobin), panorama, audiosink, NULL);
+        gst_element_link(panorama, audiosink);
+
+        GstPad *sinkpad = gst_element_get_static_pad(panorama, "sink");
+        gst_element_add_pad(audiobin, gst_ghost_pad_new("sink", sinkpad));
+        gst_object_unref(GST_OBJECT(sinkpad));
+
+        g_object_set(G_OBJECT(playbin), "audio-sink", audiobin, NULL);
+        gst_object_unref(GST_OBJECT(audiobin));
+
+        g_object_set(G_OBJECT(panorama), "method", 1, NULL);
+    }
+
     // Setup source options
     g_signal_connect(playbin, "source-setup",
                      G_CALLBACK(AudioPlayer::SourceSetup), &source);
@@ -22,7 +41,7 @@ AudioPlayer::AudioPlayer(std::string playerId, FlMethodChannel *channel)
     // Watch bus messages for one time events
     gst_bus_add_watch(bus, (GstBusFunc) AudioPlayer::OnBusMessage, this);
 
-    // Refresh continuously to emit reoccuring events
+    // Refresh continuously to emit reoccurring events
     g_timeout_add(1000, (GSourceFunc) AudioPlayer::OnRefresh, this);
 }
 
@@ -41,13 +60,14 @@ void AudioPlayer::SetSourceUrl(std::string url) {
     if (_url != url) {
         _url = url;
         gst_element_set_state(playbin, GST_STATE_NULL);
+        _isInitialized = false;
+        _isPlaying = false;
         if (!_url.empty()) {
             g_object_set(playbin, "uri", _url.c_str(), NULL);
             if (playbin->current_state != GST_STATE_READY) {
                 gst_element_set_state(playbin, GST_STATE_READY);
             }
         }
-        _isInitialized = false;
     }
 }
 
@@ -127,7 +147,11 @@ void AudioPlayer::OnMediaStateChange(GstObject *src, GstState *old_state,
         if (*new_state >= GST_STATE_READY) {
             if (!this->_isInitialized) {
                 this->_isInitialized = true;
-                Pause(); // Need to set to pause state, in order to get duration
+                if (this->_isPlaying) {
+                    Resume();
+                } else {
+                    Pause(); // Need to set to pause state, in order to get duration
+                }
             }
         } else if (this->_isInitialized) {
             this->_isInitialized = false;
@@ -188,6 +212,20 @@ void AudioPlayer::OnPlaybackEnded() {
         fl_method_channel_invoke_method(this->_channel, "audio.onComplete", map,
                                         nullptr, nullptr, nullptr);
     }
+}
+
+void AudioPlayer::SetBalance(float balance) {
+    if (!panorama) {
+        Logger::Error(std::string("Audiopanorama was not initialized"));
+        return;
+    }
+
+    if (balance > 1.0f) {
+        balance = 1.0f;
+    } else if (balance < -1.0f) {
+        balance = -1.0f;
+    }
+    g_object_set(G_OBJECT(panorama), "panorama", balance, NULL);
 }
 
 void AudioPlayer::SetLooping(bool isLooping) {
@@ -294,14 +332,12 @@ int64_t AudioPlayer::GetDuration() {
 }
 
 void AudioPlayer::Play() {
-    if (!_isInitialized) {
-        return;
-    }
     SetPosition(0);
     Resume();
 }
 
 void AudioPlayer::Pause() {
+    _isPlaying = false;
     GstStateChangeReturn ret = gst_element_set_state(playbin, GST_STATE_PAUSED);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         Logger::Error(
@@ -312,6 +348,7 @@ void AudioPlayer::Pause() {
 }
 
 void AudioPlayer::Resume() {
+    _isPlaying = true;
     if (!_isInitialized) {
         return;
     }
@@ -322,7 +359,9 @@ void AudioPlayer::Resume() {
                 std::string("Unable to set the pipeline to the playing state."));
         return;
     }
-    OnDurationUpdate(); // Update duration when start playing, as no event is emitted elsewhere
+    // Update position and duration when start playing, as no event is emitted elsewhere
+    OnPositionUpdate();
+    OnDurationUpdate();
 }
 
 void AudioPlayer::Dispose() {
@@ -331,6 +370,7 @@ void AudioPlayer::Dispose() {
     }
     gst_object_unref(bus);
     gst_object_unref(source);
+    gst_object_unref(panorama);
 
     gst_element_set_state(playbin, GST_STATE_NULL);
     gst_object_unref(playbin);

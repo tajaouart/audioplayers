@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:html';
 
-import 'package:audioplayers_platform_interface/api/player_state.dart';
 import 'package:audioplayers_platform_interface/api/release_mode.dart';
 import 'package:audioplayers_platform_interface/streams_interface.dart';
+import 'package:audioplayers_web/num_extension.dart';
+import 'package:audioplayers_web/web_audio_js.dart';
 
 class WrappedPlayer {
   final String playerId;
@@ -17,9 +18,12 @@ class WrappedPlayer {
   bool isPlaying = false;
 
   AudioElement? player;
+  StereoPannerNode? stereoPanner;
   StreamSubscription? playerTimeUpdateSubscription;
   StreamSubscription? playerEndedSubscription;
   StreamSubscription? playerLoadedDataSubscription;
+  StreamSubscription? playerPlaySubscription;
+  StreamSubscription? playerSeekedSubscription;
 
   WrappedPlayer(this.playerId, this.streamsInterface);
 
@@ -41,6 +45,10 @@ class WrappedPlayer {
     player?.volume = volume;
   }
 
+  void setBalance(double balance) {
+    stereoPanner?.pan.value = balance;
+  }
+
   void setPlaybackRate(double rate) {
     currentPlaybackRate = rate;
     player?.playbackRate = rate;
@@ -50,23 +58,47 @@ class WrappedPlayer {
     if (currentUrl == null) {
       return;
     }
-    Duration toDuration(num jsNum) => Duration(
-          milliseconds:
-              (1000 * (jsNum.isNaN || jsNum.isInfinite ? 0 : jsNum)).round(),
-        );
 
     final p = player = AudioElement(currentUrl);
+    // As the AudioElement is created dynamically via script,
+    // features like 'stereo panning' need the CORS header to be enabled.
+    // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    p.crossOrigin = 'anonymous';
     p.loop = shouldLoop();
     p.volume = currentVolume;
     p.playbackRate = currentPlaybackRate;
-    playerLoadedDataSubscription = p.onLoadedData.listen((event) {
-      streamsInterface.emitDuration(playerId, toDuration(p.duration));
+
+    // setup stereo panning
+    final audioContext = JsAudioContext();
+    final source = audioContext.createMediaElementSource(player!);
+    stereoPanner = audioContext.createStereoPanner();
+    source.connect(stereoPanner!);
+    stereoPanner?.connect(audioContext.destination);
+
+    playerPlaySubscription = p.onPlay.listen((_) {
+      streamsInterface.emitDuration(
+        playerId,
+        p.duration.fromSecondsToDuration(),
+      );
+    });
+    playerLoadedDataSubscription = p.onLoadedData.listen((_) {
+      streamsInterface.emitDuration(
+        playerId,
+        p.duration.fromSecondsToDuration(),
+      );
     });
     playerTimeUpdateSubscription = p.onTimeUpdate.listen((_) {
-      streamsInterface.emitPosition(playerId, toDuration(p.currentTime));
+      streamsInterface.emitPosition(
+        playerId,
+        p.currentTime.fromSecondsToDuration(),
+      );
+    });
+    playerSeekedSubscription = p.onSeeked.listen((_) {
+      streamsInterface.emitSeekComplete(playerId);
     });
     playerEndedSubscription = p.onEnded.listen((_) {
-      streamsInterface.emitPlayerState(playerId, PlayerState.stopped);
+      pausedAt = 0;
+      player?.currentTime = 0;
       streamsInterface.emitComplete(playerId);
     });
   }
@@ -81,6 +113,7 @@ class WrappedPlayer {
   void release() {
     _cancel();
     player = null;
+    stereoPanner = null;
 
     playerLoadedDataSubscription?.cancel();
     playerLoadedDataSubscription = null;
@@ -88,6 +121,10 @@ class WrappedPlayer {
     playerTimeUpdateSubscription = null;
     playerEndedSubscription?.cancel();
     playerEndedSubscription = null;
+    playerSeekedSubscription?.cancel();
+    playerSeekedSubscription = null;
+    playerPlaySubscription?.cancel();
+    playerPlaySubscription = null;
   }
 
   void start(double position) {
@@ -108,12 +145,14 @@ class WrappedPlayer {
 
   void pause() {
     pausedAt = player?.currentTime as double?;
-    _cancel();
+    isPlaying = false;
+    player?.pause();
   }
 
   void stop() {
-    pausedAt = 0;
     _cancel();
+    pausedAt = 0;
+    player?.currentTime = 0;
   }
 
   void seek(int position) {

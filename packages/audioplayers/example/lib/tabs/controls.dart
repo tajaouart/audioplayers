@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 class ControlsTab extends StatefulWidget {
   final AudioPlayer player;
 
-  const ControlsTab({Key? key, required this.player}) : super(key: key);
+  const ControlsTab({super.key, required this.player});
 
   @override
   State<ControlsTab> createState() => _ControlsTabState();
@@ -19,24 +19,27 @@ class _ControlsTabState extends State<ControlsTab>
     with AutomaticKeepAliveClientMixin<ControlsTab> {
   String modalInputSeek = '';
 
-  Future<void> update(Future<void> Function() fn) async {
+  Future<void> _update(Future<void> Function() fn) async {
     await fn();
     // update everyone who listens to "player"
     setState(() {});
   }
 
-  Future<void> seekPercent(double percent) async {
+  Future<void> _seekPercent(double percent) async {
     final duration = await widget.player.getDuration();
     if (duration == null) {
-      toast('Failed to get duration for proportional seek.');
+      toast(
+        'Failed to get duration for proportional seek.',
+        textKey: const Key('toast-proportional-seek-duration-null'),
+      );
       return;
     }
     final position = duration * percent;
-    seekDuration(position);
+    _seekDuration(position);
   }
 
-  Future<void> seekDuration(Duration duration) async {
-    update(() => widget.player.seek(duration));
+  Future<void> _seekDuration(Duration duration) async {
+    await _update(() => widget.player.seek(duration));
   }
 
   @override
@@ -74,9 +77,25 @@ class _ControlsTabState extends State<ControlsTab>
           children: [
             const Text('Volume'),
             ...[0.0, 0.5, 1.0, 2.0].map((it) {
+              final formattedVal = it.toStringAsFixed(1);
               return Btn(
-                txt: it.toString(),
+                key: Key('control-volume-$formattedVal'),
+                txt: formattedVal,
                 onPressed: () => widget.player.setVolume(it),
+              );
+            }),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Balance'),
+            ...[-1.0, -0.5, 0.0, 1.0].map((it) {
+              final formattedVal = it.toStringAsFixed(1);
+              return Btn(
+                key: Key('control-balance-$formattedVal'),
+                txt: formattedVal,
+                onPressed: () => widget.player.setBalance(it),
               );
             }),
           ],
@@ -86,8 +105,10 @@ class _ControlsTabState extends State<ControlsTab>
           children: [
             const Text('Rate'),
             ...[0.0, 0.5, 1.0, 2.0].map((it) {
+              final formattedVal = it.toStringAsFixed(1);
               return Btn(
-                txt: it.toString(),
+                key: Key('control-rate-$formattedVal'),
+                txt: formattedVal,
                 onPressed: () => widget.player.setPlaybackRate(it),
               );
             }),
@@ -98,10 +119,14 @@ class _ControlsTabState extends State<ControlsTab>
           children: [
             const Text('Player Mode'),
             EnumTgl<PlayerMode>(
-              options: PlayerMode.values,
+              key: const Key('control-player-mode'),
+              options: {
+                for (var e in PlayerMode.values)
+                  'control-player-mode-${e.name}': e
+              },
               selected: widget.player.mode,
-              onChange: (playerMode) {
-                update(() => widget.player.setPlayerMode(playerMode));
+              onChange: (playerMode) async {
+                await _update(() => widget.player.setPlayerMode(playerMode));
               },
             ),
           ],
@@ -111,10 +136,14 @@ class _ControlsTabState extends State<ControlsTab>
           children: [
             const Text('Release Mode'),
             EnumTgl<ReleaseMode>(
-              options: ReleaseMode.values,
+              key: const Key('control-release-mode'),
+              options: {
+                for (var e in ReleaseMode.values)
+                  'control-release-mode-${e.name}': e
+              },
               selected: widget.player.releaseMode,
-              onChange: (releaseMode) {
-                update(() => widget.player.setReleaseMode(releaseMode));
+              onChange: (releaseMode) async {
+                await _update(() => widget.player.setReleaseMode(releaseMode));
               },
             ),
           ],
@@ -124,9 +153,11 @@ class _ControlsTabState extends State<ControlsTab>
           children: [
             const Text('Seek'),
             ...[0.0, 0.5, 1.0].map((it) {
+              final formattedVal = it.toStringAsFixed(1);
               return Btn(
-                txt: it.toString(),
-                onPressed: () => seekPercent(it),
+                key: Key('control-seek-$formattedVal'),
+                txt: formattedVal,
+                onPressed: () => _seekPercent(it),
               );
             }),
             Btn(
@@ -145,7 +176,7 @@ class _ControlsTabState extends State<ControlsTab>
                         txt: 'millis',
                         onPressed: () {
                           Navigator.of(context).pop();
-                          seekDuration(
+                          _seekDuration(
                             Duration(
                               milliseconds: int.parse(modalInputSeek),
                             ),
@@ -156,7 +187,7 @@ class _ControlsTabState extends State<ControlsTab>
                         txt: 'seconds',
                         onPressed: () {
                           Navigator.of(context).pop();
-                          seekDuration(
+                          _seekDuration(
                             Duration(
                               seconds: int.parse(modalInputSeek),
                             ),
@@ -167,7 +198,7 @@ class _ControlsTabState extends State<ControlsTab>
                         txt: '%',
                         onPressed: () {
                           Navigator.of(context).pop();
-                          seekPercent(double.parse(modalInputSeek));
+                          _seekPercent(double.parse(modalInputSeek));
                         },
                       ),
                       Btn(

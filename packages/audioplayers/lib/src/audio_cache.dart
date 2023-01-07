@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+// TODO(gustl22): remove when upgrading min Flutter version to >=3.3.0
+// ignore: unnecessary_import
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -30,7 +32,7 @@ class AudioCache {
   /// On mobile/desktop, the URIs are from local files where the bytes have been
   /// copied.
   /// On web, the URIs are external links for pre-loaded files.
-  Map<String, Uri> loadedFiles = {};
+  final Map<String, Uri> loadedFiles = {};
 
   /// This is the path inside your assets folder where your files lie.
   ///
@@ -48,7 +50,7 @@ class AudioCache {
   /// Does nothing if the file was not on cache.
   /// Note: web relies on the browser cache which is handled entirely by the
   /// browser, thus this will no-op.
-  Future<void> clear(Uri fileName) async {
+  Future<void> clear(String fileName) async {
     final uri = loadedFiles.remove(fileName);
     if (uri != null && !kIsWeb) {
       await File(uri.toFilePath()).delete();
@@ -57,7 +59,7 @@ class AudioCache {
 
   /// Clears the whole cache.
   Future<void> clearAll() async {
-    await Future.wait(loadedFiles.values.map(clear));
+    await Future.wait(loadedFiles.keys.map(clear));
   }
 
   Future<Uri> fetchToMemory(String fileName) async {

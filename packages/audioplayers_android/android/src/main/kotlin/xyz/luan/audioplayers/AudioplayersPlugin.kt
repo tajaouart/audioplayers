@@ -17,19 +17,21 @@ import xyz.luan.audioplayers.player.WrappedPlayer
 import xyz.luan.audioplayers.source.BytesSource
 import xyz.luan.audioplayers.source.UrlSource
 import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 
 typealias FlutterHandler = (call: MethodCall, response: MethodChannel.Result) -> Unit
 
-class AudioplayersPlugin : FlutterPlugin {
+class AudioplayersPlugin : FlutterPlugin, IUpdateCallback {
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
     private lateinit var channel: MethodChannel
     private lateinit var globalChannel: MethodChannel
     private lateinit var context: Context
 
-    private val players = mutableMapOf<String, WrappedPlayer>()
+    private val players = ConcurrentHashMap<String, WrappedPlayer>()
     private val handler = Handler(Looper.getMainLooper())
-    private var positionUpdates: Runnable? = null
+    private var updateRunnable: Runnable? = null
 
     private var defaultAudioContext = AudioContextAndroid()
 
@@ -39,10 +41,12 @@ class AudioplayersPlugin : FlutterPlugin {
         channel.setMethodCallHandler { call, response -> safeCall(call, response, ::handler) }
         globalChannel = MethodChannel(binding.binaryMessenger, "xyz.luan/audioplayers.global")
         globalChannel.setMethodCallHandler { call, response -> safeCall(call, response, ::globalHandler) }
+        updateRunnable = UpdateRunnable(players, channel, handler, this)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPluginBinding) {
-        stopPositionUpdates()
+        stopUpdates()
+        updateRunnable = null
         players.values.forEach { it.release() }
         players.clear()
         mainScope.cancel()
@@ -105,6 +109,11 @@ class AudioplayersPlugin : FlutterPlugin {
                 val volume = call.argument<Double>("volume") ?: error("volume is required")
                 player.volume = volume.toFloat()
             }
+            "setBalance" -> {
+                Logger.error("setBalance is not currently implemented on Android")
+                response.notImplemented()
+                return
+            }
             "setPlaybackRate" -> {
                 val rate = call.argument<Double>("playbackRate") ?: error("playbackRate is required")
                 player.rate = rate.toFloat()
@@ -126,7 +135,6 @@ class AudioplayersPlugin : FlutterPlugin {
                 val playerMode = call.enumArgument<PlayerMode>("playerMode")
                     ?: error("playerMode is required")
                 player.playerMode = playerMode
-                return
             }
             "setAudioContext" -> {
                 val audioContext = call.audioContext()
@@ -151,7 +159,7 @@ class AudioplayersPlugin : FlutterPlugin {
     }
 
     fun handleIsPlaying() {
-        startPositionUpdates()
+        startUpdates()
     }
 
     fun handleDuration(player: WrappedPlayer) {
@@ -168,58 +176,56 @@ class AudioplayersPlugin : FlutterPlugin {
 
     fun handleSeekComplete(player: WrappedPlayer) {
         channel.invokeMethod("audio.onSeekComplete", buildArguments(player.playerId))
+        channel.invokeMethod(
+            "audio.onCurrentPosition",
+            buildArguments(player.playerId, player.getCurrentPosition() ?: 0)
+        )
     }
 
-    private fun startPositionUpdates() {
-        if (positionUpdates != null) {
-            return
-        }
-        positionUpdates = UpdateCallback(players, channel, handler, this).also {
-            handler.post(it)
-        }
+    override fun startUpdates() {
+        updateRunnable?.let { handler.post(it) }
     }
 
-    private fun stopPositionUpdates() {
-        positionUpdates = null
+    override fun stopUpdates() {
         handler.removeCallbacksAndMessages(null)
     }
 
-    private class UpdateCallback(
-        mediaPlayers: Map<String, WrappedPlayer>,
+    private class UpdateRunnable(
+        mediaPlayers: ConcurrentMap<String, WrappedPlayer>,
         channel: MethodChannel,
         handler: Handler,
-        audioplayersPlugin: AudioplayersPlugin,
+        updateCallback: IUpdateCallback,
     ) : Runnable {
         private val mediaPlayers = WeakReference(mediaPlayers)
         private val channel = WeakReference(channel)
         private val handler = WeakReference(handler)
-        private val audioplayersPlugin = WeakReference(audioplayersPlugin)
+        private val updateCallback = WeakReference(updateCallback)
 
         override fun run() {
             val mediaPlayers = mediaPlayers.get()
             val channel = channel.get()
             val handler = handler.get()
-            val audioplayersPlugin = audioplayersPlugin.get()
-            if (mediaPlayers == null || channel == null || handler == null || audioplayersPlugin == null) {
-                audioplayersPlugin?.stopPositionUpdates()
+            val updateCallback = updateCallback.get()
+            if (mediaPlayers == null || channel == null || handler == null || updateCallback == null) {
+                updateCallback?.stopUpdates()
                 return
             }
-            var nonePlaying = true
+            var isAnyPlaying = false
             for (player in mediaPlayers.values) {
                 if (!player.isActuallyPlaying()) {
                     continue
                 }
-                nonePlaying = false
+                isAnyPlaying = true
                 val key = player.playerId
                 val duration = player.getDuration()
                 val time = player.getCurrentPosition()
                 channel.invokeMethod("audio.onDuration", buildArguments(key, duration ?: 0))
                 channel.invokeMethod("audio.onCurrentPosition", buildArguments(key, time ?: 0))
             }
-            if (nonePlaying) {
-                audioplayersPlugin.stopPositionUpdates()
-            } else {
+            if (isAnyPlaying) {
                 handler.postDelayed(this, 200)
+            } else {
+                updateCallback.stopUpdates()
             }
         }
 
@@ -233,6 +239,11 @@ class AudioplayersPlugin : FlutterPlugin {
             ).toMap()
         }
     }
+}
+
+private interface IUpdateCallback {
+    fun stopUpdates()
+    fun startUpdates()
 }
 
 private inline fun <reified T : Enum<T>> MethodCall.enumArgument(name: String): T? {

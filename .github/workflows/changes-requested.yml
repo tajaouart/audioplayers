@@ -2,7 +2,7 @@ name: changes-requested
 
 on:
   schedule:
-    - cron: "0 * * * *" # pick a cron here, this is every 1h
+    - cron: "0 0 * * *" # pick a cron here, this is every day
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # these are optional, if you want to configure:
-          days-until-close: 5
+          days-until-close: 7
           trigger-label: changes-requested
           closing-comment: This issue was closed by the changes-requested bot due to inactivity.
           dry-run: false

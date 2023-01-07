@@ -62,6 +62,7 @@ public:
     void SetLooping(bool isLooping);
     void SetVolume(double volume);
     void SetPlaybackSpeed(double playbackSpeed);
+    void SetBalance(double balance);
     void Play();
     void Pause();
     void Resume();
@@ -88,6 +89,7 @@ private:
     void OnMediaError(MF_MEDIA_ENGINE_ERR error, HRESULT hr);
     void OnMediaStateChange(media::MediaEngineWrapper::BufferingState bufferingState);
     void OnPlaybackEnded();
+    void OnDurationUpdate();
     void OnTimeUpdate();
     void OnSeekCompleted();
 
