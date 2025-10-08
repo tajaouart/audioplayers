@@ -1,50 +1,73 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/services.dart';
+import 'package:file/memory.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class MyAudioCache extends AudioCache {
+class FakeAudioCache extends AudioCache {
   List<String> called = [];
 
-  MyAudioCache({String prefix = 'assets/'}) : super(prefix: prefix);
+  FakeAudioCache({super.prefix, super.cacheId});
 
   @override
   Future<Uri> fetchToMemory(String fileName) async {
     called.add(fileName);
-    return Uri.parse('test/assets/$fileName');
+    return super.fetchToMemory(fileName);
   }
+
+  @override
+  Future<ByteData> loadAsset(String path) async {
+    return ByteData.sublistView(utf8.encode(path));
+  }
+
+  @override
+  Future<String> getTempDir() async => '/';
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const _channel = MethodChannel('plugins.flutter.io/path_provider');
-  _channel.setMockMethodCallHandler((c) async => '/tmp');
-
-  const channel = MethodChannel('xyz.luan/audioplayers');
-  channel.setMockMethodCallHandler((MethodCall call) async => 1);
+  setUp(() {
+    AudioCache.fileSystem = MemoryFileSystem.test();
+  });
 
   group('AudioCache', () {
     test('sets cache', () async {
-      final player = MyAudioCache();
-      await player.load('audio.mp3');
-      expect(player.loadedFiles['audio.mp3'], isNotNull);
-      expect(player.called, hasLength(1));
-      player.called.clear();
+      final cache = FakeAudioCache();
+      await cache.load('audio.mp3');
+      expect(cache.loadedFiles['audio.mp3'], isNotNull);
+      expect(cache.called, hasLength(1));
+      cache.called.clear();
 
-      await player.load('audio.mp3');
-      expect(player.called, hasLength(0));
+      await cache.load('audio.mp3');
+      expect(cache.called, hasLength(0));
     });
 
     test('clear cache', () async {
-      final player = MyAudioCache();
-      await player.load('audio.mp3');
-      expect(player.loadedFiles['audio.mp3'], isNotNull);
-      player.clearAll();
-      expect(player.loadedFiles, <String, Uri>{});
-      await player.load('audio.mp3');
-      expect(player.loadedFiles.isNotEmpty, isTrue);
-      player.clear('audio.mp3');
-      expect(player.loadedFiles, <String, Uri>{});
+      final cache = FakeAudioCache();
+      await cache.load('audio.mp3');
+      expect(cache.loadedFiles['audio.mp3'], isNotNull);
+      await cache.clearAll();
+      expect(cache.loadedFiles, <String, Uri>{});
+      await cache.load('audio.mp3');
+      expect(cache.loadedFiles.isNotEmpty, isTrue);
+      await cache.clear('audio.mp3');
+      expect(cache.loadedFiles, <String, Uri>{});
+    });
+
+    test('Use different location for two audio caches', () async {
+      const fileName = 'audio.mp3';
+      final cacheA = FakeAudioCache(cacheId: 'cache-path-A');
+      await cacheA.load(fileName);
+      expect(cacheA.loadedFiles[fileName]?.path, '//cache-path-A/audio.mp3');
+
+      final cacheB = FakeAudioCache(cacheId: 'cache-path-B');
+      await cacheB.load(fileName);
+      expect(cacheB.loadedFiles[fileName]?.path, '//cache-path-B/audio.mp3');
+
+      await cacheA.clearAll();
+      await cacheB.clearAll();
     });
   });
 }

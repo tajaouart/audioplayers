@@ -11,16 +11,17 @@ import java.net.URL
 data class UrlSource(
     val url: String,
     val isLocal: Boolean,
-): Source {
+) : Source {
     override fun setForMediaPlayer(mediaPlayer: MediaPlayer) {
         mediaPlayer.setDataSource(url)
     }
 
     override fun setForSoundPool(soundPoolPlayer: SoundPoolPlayer) {
-        soundPoolPlayer.setUrlSource(this)
+        soundPoolPlayer.release()
+        soundPoolPlayer.urlSource = this
     }
 
-    fun getAudioPathForSoundPool(): String? {
+    fun getAudioPathForSoundPool(): String {
         if (isLocal) {
             return url.removePrefix("file://")
         }

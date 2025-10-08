@@ -2,6 +2,26 @@ name: build example
 on:
   workflow_dispatch:
     inputs:
+      flutter_version:
+        description: 'Flutter Version'
+        required: false
+        default: 'any'
+        type: choice
+        options:
+          - 'any'
+          - '3.32.x'
+          - '3.29.x'
+          - '3.27.x'
+      flutter_channel:
+        description: 'Flutter Channel'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+          - 'stable'
+          - 'beta'
+          - 'dev'
+          - 'master'
       enable_android:
         description: 'Build Android'
         required: false
@@ -32,8 +52,21 @@ on:
         required: false
         default: true
         type: boolean
+      upload_pages_artifact:
+        description: 'Upload build artifact for GH pages'
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
+      flutter_version:
+        required: false
+        default: '3.32.4'
+        type: string
+      flutter_channel:
+        required: false
+        default: 'stable'
+        type: string
       enable_android:
         required: false
         default: true
@@ -58,6 +91,10 @@ on:
         required: false
         default: true
         type: boolean
+      upload_pages_artifact:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   web:
@@ -65,67 +102,69 @@ jobs:
     timeout-minutes: 30
     if: inputs.enable_web
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
 
       - name: Example app - Build Web app
         working-directory: ./packages/audioplayers/example
-        run: flutter build web
+        run: flutter build web --base-href "/audioplayers/"
+      - name: Example app - Build Web app in WASM
+        working-directory: ./packages/audioplayers/example
+        run: flutter build web --base-href "/audioplayers/" --wasm
+      - name: Upload pages artifact
+        if: inputs.upload_pages_artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./packages/audioplayers/example/build/web
 
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: inputs.enable_android
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Java
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
 
       - name: Example App - Build Android APK
         working-directory: ./packages/audioplayers/example
         run: flutter build apk --release
 
-      - name: Run Android unit tests
-        working-directory: ./packages/audioplayers/example/android
-        run: ./gradlew test
-
   ios:
-    runs-on: macOS-latest
+    runs-on: macos-14
     timeout-minutes: 30
     if: inputs.enable_ios
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
 
       - name: Example app - Build iOS
         working-directory: ./packages/audioplayers/example
         run: flutter build ios --release --no-codesign
 
   macos:
-    runs-on: macOS-latest
+    runs-on: macos-14
     timeout-minutes: 30
     if: inputs.enable_macos
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
-
-      - name: setup-cocoapods
-        uses: maxim-lobanov/setup-cocoapods@v1
         with:
-          podfile-path: ./packages/audioplayers/example/macos/Podfile.lock
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
+
       - name: Example app - Build macOS
         working-directory: ./packages/audioplayers/example
         run: flutter build macos --release
@@ -135,9 +174,12 @@ jobs:
     timeout-minutes: 30
     if: inputs.enable_windows
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
 
       - name: Example app - Build Windows app
         working-directory: ./packages/audioplayers/example
@@ -148,9 +190,12 @@ jobs:
     timeout-minutes: 30
     if: inputs.enable_linux
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - uses: bluefireteam/melos-action@main
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: ${{ inputs.flutter_channel }}
+      - uses: bluefireteam/melos-action@v3
 
       - name: Install Flutter requirements for Linux
         run: |

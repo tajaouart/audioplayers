@@ -1,98 +1,159 @@
 import 'package:audioplayers/audioplayers.dart';
-import 'package:audioplayers_platform_interface/method_channel_interface.dart';
-import 'package:flutter/services.dart';
+import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fake_audioplayers_platform.dart';
+import 'fake_global_audioplayers_platform.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final calls = <MethodCall>[];
-  const channel = MethodChannel('xyz.luan/audioplayers');
-  channel.setMockMethodCallHandler((MethodCall call) async {
-    calls.add(call);
-    return 0;
+  final globalPlatform = FakeGlobalAudioplayersPlatform();
+  GlobalAudioplayersPlatformInterface.instance = globalPlatform;
+
+  late FakeAudioplayersPlatform platform;
+  setUp(() {
+    platform = FakeAudioplayersPlatform();
+    AudioplayersPlatformInterface.instance = platform;
   });
 
-  void clear() {
-    calls.clear();
+  Future<AudioPlayer> createPlayer({
+    required String playerId,
+  }) async {
+    final player = AudioPlayer(playerId: playerId);
+    // Avoid unpredictable position updates
+    player.positionUpdater = null;
+    expect(player.source, null);
+    await player.creatingCompleter.future;
+    expect(platform.popCall().method, 'create');
+    expect(platform.popLastCall().method, 'getEventStream');
+    return player;
   }
 
-  MethodCall popCall() {
-    return calls.removeAt(0);
-  }
+  group('AudioPlayer Methods', () {
+    late AudioPlayer player;
 
-  MethodCall popLastCall() {
-    expect(calls, hasLength(1));
-    return popCall();
-  }
-
-  group('AudioPlayers', () {
-    test('#setSource', () async {
-      calls.clear();
-      final player = AudioPlayer();
+    setUp(() async {
+      player = await createPlayer(playerId: 'p1');
       expect(player.source, null);
+    });
 
+    test('#setSource and #dispose', () async {
       await player.setSource(UrlSource('internet.com/file.mp3'));
-      expect(popLastCall().method, 'setSourceUrl');
+      expect(platform.popLastCall().method, 'setSourceUrl');
       expect(player.source, isInstanceOf<UrlSource>());
       final urlSource = player.source as UrlSource?;
       expect(urlSource?.url, 'internet.com/file.mp3');
 
-      await player.release();
+      await player.dispose();
+      expect(platform.popCall().method, 'stop');
+      expect(platform.popCall().method, 'release');
+      expect(platform.popLastCall().method, 'dispose');
       expect(player.source, null);
     });
 
     test('#play', () async {
-      calls.clear();
-      final player = AudioPlayer();
       await player.play(UrlSource('internet.com/file.mp3'));
-      final call1 = popCall();
+      final call1 = platform.popCall();
       expect(call1.method, 'setSourceUrl');
-      expect(call1.getString('url'), 'internet.com/file.mp3');
-      final call2 = popLastCall();
-      expect(call2.method, 'resume');
+      expect(call1.value, 'internet.com/file.mp3');
+      expect(platform.popLastCall().method, 'resume');
     });
 
     test('multiple players', () async {
-      calls.clear();
-      final player1 = AudioPlayer();
-      final player2 = AudioPlayer();
+      final player2 = await createPlayer(playerId: 'p2');
 
-      await player1.play(UrlSource('internet.com/file.mp3'));
-      final call1 = popCall();
-      final player1Id = call1.getString('playerId');
+      await player.play(UrlSource('internet.com/file.mp3'));
+      final call1 = platform.popCall();
+      expect(call1.id, 'p1');
       expect(call1.method, 'setSourceUrl');
-      expect(call1.getString('url'), 'internet.com/file.mp3');
-      final call2 = popLastCall();
-      expect(call2.method, 'resume');
+      expect(call1.value, 'internet.com/file.mp3');
+      expect(platform.popLastCall().method, 'resume');
 
-      clear();
-      await player1.play(UrlSource('internet.com/file.mp3'));
-      expect(popCall().getString('playerId'), player1Id);
+      platform.clear();
+      await player.play(UrlSource('internet.com/file.mp3'));
+      expect(platform.popCall().id, 'p1');
 
-      clear();
+      platform.clear();
       await player2.play(UrlSource('internet.com/file.mp3'));
-      expect(popCall().getString('playerId'), isNot(player1Id));
+      expect(platform.popCall().id, 'p2');
 
-      clear();
-      await player1.play(UrlSource('internet.com/file.mp3'));
-      expect(popCall().getString('playerId'), player1Id);
+      platform.clear();
+      await player.play(UrlSource('internet.com/file.mp3'));
+      expect(platform.popCall().id, 'p1');
     });
 
     test('#resume, #pause and #duration', () async {
-      calls.clear();
-      final player = AudioPlayer();
       await player.setSourceUrl('assets/audio.mp3');
-      expect(popLastCall().method, 'setSourceUrl');
+      expect(platform.popLastCall().method, 'setSourceUrl');
 
       await player.resume();
-      expect(popLastCall().method, 'resume');
+      expect(platform.popLastCall().method, 'resume');
 
       await player.getDuration();
-      expect(popLastCall().method, 'getDuration');
+      expect(platform.popLastCall().method, 'getDuration');
 
       await player.pause();
-      expect(popLastCall().method, 'pause');
+      expect(platform.popLastCall().method, 'pause');
+    });
+
+    test('set #volume, #balance, #playbackRate, #playerMode, #releaseMode',
+        () async {
+      await player.setVolume(0.1);
+      expect(player.volume, 0.1);
+      expect(platform.popLastCall().method, 'setVolume');
+
+      await player.setBalance(0.2);
+      expect(player.balance, 0.2);
+      expect(platform.popLastCall().method, 'setBalance');
+
+      await player.setPlaybackRate(0.3);
+      expect(player.playbackRate, 0.3);
+      expect(platform.popLastCall().method, 'setPlaybackRate');
+
+      await player.setPlayerMode(PlayerMode.lowLatency);
+      expect(player.mode, PlayerMode.lowLatency);
+      expect(platform.popLastCall().method, 'setPlayerMode');
+
+      await player.setReleaseMode(ReleaseMode.loop);
+      expect(player.releaseMode, ReleaseMode.loop);
+      expect(platform.popLastCall().method, 'setReleaseMode');
+    });
+  });
+
+  group('AudioPlayers Events', () {
+    late AudioPlayer player;
+
+    setUp(() async {
+      player = await createPlayer(playerId: 'p1');
+      expect(player.source, null);
+    });
+
+    test('event stream', () async {
+      final audioEvents = <AudioEvent>[
+        const AudioEvent(
+          eventType: AudioEventType.duration,
+          duration: Duration(milliseconds: 98765),
+        ),
+        const AudioEvent(
+          eventType: AudioEventType.log,
+          logMessage: 'someLogMessage',
+        ),
+        const AudioEvent(
+          eventType: AudioEventType.complete,
+        ),
+        const AudioEvent(
+          eventType: AudioEventType.seekComplete,
+        ),
+      ];
+
+      expect(
+        player.eventStream,
+        emitsInOrder(audioEvents),
+      );
+
+      audioEvents.forEach(platform.eventStreamControllers['p1']!.add);
+      await platform.eventStreamControllers['p1']!.close();
     });
   });
 }

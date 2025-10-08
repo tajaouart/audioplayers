@@ -5,6 +5,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -19,75 +20,99 @@ extern "C" {
 #include <gst/gst.h>
 }
 
+enum ReleaseMode { stop, release, loop };
+
+static std::unordered_map<std::string, ReleaseMode> const releaseModeMap = {
+    {"ReleaseMode.stop", ReleaseMode::stop},
+    {"ReleaseMode.release", ReleaseMode::release},
+    {"ReleaseMode.loop", ReleaseMode::loop}};
+
 class AudioPlayer {
-public:
-    AudioPlayer(std::string playerId, FlMethodChannel *channel);
+ public:
+  AudioPlayer(std::string playerId,
+              FlMethodChannel* methodChannel,
+              FlEventChannel* eventChannel);
 
-    int64_t GetPosition();
+  std::optional<int64_t> GetPosition();
 
-    int64_t GetDuration();
+  std::optional<int64_t> GetDuration();
 
-    bool GetLooping();
+  ReleaseMode GetReleaseMode();
 
-    void Play();
+  void Play();
 
-    void Pause();
+  void Pause();
 
-    void Resume();
+  void Stop();
 
-    void Dispose();
+  void Resume();
 
-    void SetBalance(float balance);
+  void Dispose();
 
-    void SetLooping(bool isLooping);
+  void SetBalance(float balance);
 
-    void SetVolume(double volume);
+  void SetReleaseMode(ReleaseMode releaseMode);
 
-    void SetPlaybackRate(double rate);
+  void SetVolume(double volume);
 
-    void SetPosition(int64_t position);
+  void SetPlaybackRate(double rate);
 
-    void SetSourceUrl(std::string url);
+  void SetPosition(int64_t position);
 
-    virtual ~AudioPlayer();
+  void SetSourceUrl(std::string url);
 
-private:
-    // Gst members
-    GstElement *playbin;
-    GstElement *source;
-    GstElement *panorama;
-    GstBus *bus;
+  void ReleaseMediaSource();
 
-    bool _isInitialized = false;
-    bool _isPlaying = false;
-    bool _isLooping = false;
-    bool _isSeekCompleted = true;
-    double _playbackRate = 1.0;
+  void OnError(const gchar* code,
+               const gchar* message,
+               FlValue* details,
+               GError** error);
 
-    std::string _url{};
-    std::string _playerId;
-    FlMethodChannel *_channel;
+  void OnLog(const gchar* message);
 
-    static void SourceSetup(GstElement *playbin, GstElement *source,
-                            GstElement **p_src);
+  virtual ~AudioPlayer();
 
-    static gboolean OnBusMessage(GstBus *bus, GstMessage *message,
-                                 AudioPlayer *data);
+ private:
+  // Gst members
+  GstElement* playbin = nullptr;
+  GstElement* source = nullptr;
+  GstElement* panorama = nullptr;
+  GstElement* audiobin = nullptr;
+  GstElement* audiosink = nullptr;
+  GstPad* panoramaSinkPad = nullptr;
+  GstBus* bus = nullptr;
 
-    static gboolean OnRefresh(AudioPlayer *data);
+  bool _isInitialized = false;
+  bool _isPlaying = false;
+  ReleaseMode _releaseMode = ReleaseMode::release;
+  bool _isSeekCompleted = true;
+  double _playbackRate = 1.0;
 
-    void SetPlayback(int64_t seekTo, double rate);
+  std::string _url{};
+  std::string _playerId;
+  FlEventChannel* _eventChannel;
 
-    void OnMediaError(GError *error, gchar *debug);
+  static void SourceSetup(GstElement* playbin,
+                          GstElement* source,
+                          GstElement** p_src);
 
-    void OnMediaStateChange(GstObject *src, GstState *old_state,
-                            GstState *new_state);
+  static gboolean OnBusMessage(GstBus* bus,
+                               GstMessage* message,
+                               AudioPlayer* data);
 
-    void OnPositionUpdate();
+  void SetPlayback(int64_t seekTo, double rate);
 
-    void OnDurationUpdate();
+  void OnMediaError(GError* error, gchar* debug);
 
-    void OnSeekCompleted();
+  void OnMediaStateChange(GstObject* src,
+                          GstState* old_state,
+                          GstState* new_state);
 
-    void OnPlaybackEnded();
+  void OnDurationUpdate();
+
+  void OnSeekCompleted();
+
+  void OnPlaybackEnded();
+
+  void OnPrepared(bool isPrepared);
 };

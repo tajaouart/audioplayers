@@ -1,24 +1,33 @@
 # Feature Parity Table
 
-Not every feature is available on every platform yet. Use this table to keep track of our work and progress, and please help if you want :)
+Not every feature is available on every platform yet. Use this table to keep track of our work and progress, and please help out if you want to. :)
 
-## Note on Linux Support
+If you would like to assist us implement a missing feature, please browse the [issue tracker](https://github.com/bluefireteam/audioplayers/issues) and reach out to us on our [Discord](https://discord.gg/pxrBmy4) server so we can coordinate efforts.
 
-This is the current status of Desktop for us:
+## Note on Android
 
-* [DONE] Add platform interface, refactor API so native implementations are cleaner
-* [DONE] Federate plugin and provide structure to add multi-platform support
-* [DONE] Add macOS support through Darwin (existing)
-* [DONE] (thanks @azchohfi) Add Windows support
-* [DONE] Add Linux support
+### Media3 ExoPlayer
 
-If you would like to assist us on implementing further steps, please reach our on our [Discord](https://discord.gg/pxrBmy4) server so we can coordinate efforts.
+We are going to switch from the internal [Android MediaPlayer](https://developer.android.com/reference/android/media/MediaPlayer) to the recommended [Media3 ExoPlayer](https://developer.android.com/media/media3).
+We still endorse the old media player until we are sure, the Media3 implementation fulfills all the needs.
 
-## Note on Android Support
+You already can try the Media3 implementation by adding `audioplayers_android_exo` to your apps `pubspec.yaml`.
+This [overrides](https://docs.flutter.dev/packages-and-plugins/developing-packages#non-endorsed-federated-plugin) our endorsed Android plugin implementation `audioplayers_android`:
 
-Giving support to old Android devices is very hard, on this plugin we set the minSdk as 16, but we only ensure support >= 23 as that is the minimum version that the team has devices available to test changes and new features.
+```yaml
+dependencies:
+  # ...
+  audioplayers: any
+  audioplayers_android_exo: any
+```
 
-This mean that, audioplayers should work on older devices, but we can't give any guarantees, we will not be able to look after issues regarding API < 23. But we would glady take any pull requests from the community that fixes or improve support on those old versions.
+For more, see the [audioplayers_android_exo](https://github.com/bluefireteam/audioplayers/blob/main/packages/audioplayers_android_exo/README.md) package.
+
+### Support for old SDKs
+
+Giving support to old Android devices is very hard, on this plugin we set the minSdk as 19, but we only ensure support >= 23 as that is the minimum version that the team has devices available to test changes and new features.
+
+This mean that, audioplayers should work on older devices, but we can't give any guarantees, we will not be able to look after issues regarding API < 23. But we would gladly take any pull requests from the community that fixes or improve support on those old versions.
 
 
 ## Main Features
@@ -41,14 +50,14 @@ Note: LLM means Low Latency Mode.
         <tr><td>local asset</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>external URL file</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>external URL stream</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
-        <tr><td>byte array</td><td>SDK >=23</td><td>not yet</td><td>not yet</td><td>not yet</td><td>not yet</td><td>not yet</td></tr>
+        <tr><td>byte array</td><td>SDK >=23</td><td>via conversion</td><td>via conversion</td><td>via conversion</td><td>yes</td><td>via conversion</td></tr>
         <tr><td colspan="7"><strong>Audio Config</strong></td></tr>
         <tr><td>set url</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>audio cache (pre-load)</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
-        <tr><td>low latency mode</td><td>SDK >=21</td><td>no</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
+        <tr><td>low latency mode</td><td>SDK >=21 (except `audioplayers_android_exo`) </td><td>no</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td colspan="7"><strong>Audio Control Commands</strong></td></tr>
         <tr><td>resume / pause / stop</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
-        <tr><td>release</td><td>yes</td><td>yes (no mode)</td><td>yes (no mode)</td><td>yes (no mode)</td><td>not yet</td><td>not yet</td></tr>
+        <tr><td>release</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>loop</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>volume</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>seek</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
@@ -59,13 +68,13 @@ Note: LLM means Low Latency Mode.
         <tr><td>stay awake</td><td>yes (except LLM)</td><td>yes</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td>recording active</td><td>not yet</td><td>yes</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
         <tr><td>playing route</td><td>yes (except LLM)</td><td>yes</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
-        <tr><td>balance</td><td>not yet</td><td>not yet</td><td>not yet</td><td>yes</td><td>yes</td><td>yes</td></tr>
+        <tr><td>balance</td><td>yes</td><td>not yet</td><td>not yet</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td colspan="7"><strong>Streams</strong></td></tr>
         <tr><td>duration event</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>position event</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>state event</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
         <tr><td>completion event</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
-        <tr><td>error event</td><td>yes</td><td>yes</td><td>yes</td><td>not yet</td><td>yes</td><td>yes</td></tr>
+        <tr><td>log event</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
     </tbody>
 </table>
 

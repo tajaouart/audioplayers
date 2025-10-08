@@ -7,10 +7,10 @@ class Tgl extends StatelessWidget {
   final void Function(int) onChange;
 
   const Tgl({
-    super.key,
     required this.options,
     required this.selected,
     required this.onChange,
+    super.key,
   });
 
   @override
@@ -20,11 +20,16 @@ class Tgl extends StatelessWidget {
           .mapIndexed((index, element) => index == selected)
           .toList(),
       onPressed: onChange,
+      borderRadius: const BorderRadius.all(Radius.circular(8)),
+      selectedBorderColor: Theme.of(context).primaryColor,
       children: options.entries
           .map(
-            (entry) => Text(
-              entry.value,
-              key: Key(entry.key),
+            (entry) => Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                entry.value,
+                key: Key(entry.key),
+              ),
             ),
           )
           .toList(),
@@ -38,10 +43,10 @@ class EnumTgl<T extends Enum> extends StatelessWidget {
   final void Function(T) onChange;
 
   const EnumTgl({
-    super.key,
     required this.options,
     required this.selected,
     required this.onChange,
+    super.key,
   });
 
   @override

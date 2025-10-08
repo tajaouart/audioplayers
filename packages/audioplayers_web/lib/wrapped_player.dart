@@ -1,157 +1,221 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
 
-import 'package:audioplayers_platform_interface/api/release_mode.dart';
-import 'package:audioplayers_platform_interface/streams_interface.dart';
+import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart';
 import 'package:audioplayers_web/num_extension.dart';
-import 'package:audioplayers_web/web_audio_js.dart';
+import 'package:flutter/services.dart';
+import 'package:web/web.dart' as web;
 
 class WrappedPlayer {
   final String playerId;
-  final StreamsInterface streamsInterface;
+  final eventStreamController = StreamController<AudioEvent>.broadcast();
 
-  double? pausedAt;
-  double currentVolume = 1.0;
-  double currentPlaybackRate = 1.0;
-  ReleaseMode currentReleaseMode = ReleaseMode.release;
-  String? currentUrl;
-  bool isPlaying = false;
+  double? _pausedAt;
+  double _currentVolume = 1.0;
+  double _currentPlaybackRate = 1.0;
+  ReleaseMode _currentReleaseMode = ReleaseMode.release;
+  String? _currentUrl;
+  bool _isPlaying = false;
 
-  AudioElement? player;
-  StereoPannerNode? stereoPanner;
-  StreamSubscription? playerTimeUpdateSubscription;
-  StreamSubscription? playerEndedSubscription;
-  StreamSubscription? playerLoadedDataSubscription;
-  StreamSubscription? playerPlaySubscription;
-  StreamSubscription? playerSeekedSubscription;
+  web.HTMLAudioElement? player;
+  web.StereoPannerNode? _stereoPanner;
+  StreamSubscription? _playerEndedSubscription;
+  StreamSubscription? _playerLoadedDataSubscription;
+  StreamSubscription? _playerPlaySubscription;
+  StreamSubscription? _playerSeekedSubscription;
+  StreamSubscription? _playerErrorSubscription;
 
-  WrappedPlayer(this.playerId, this.streamsInterface);
+  WrappedPlayer(this.playerId);
 
-  void setUrl(String url) {
-    if (currentUrl == url) {
-      return; // nothing to do
+  Future<void> setUrl(String url) async {
+    if (_currentUrl == url) {
+      eventStreamController.add(
+        const AudioEvent(
+          eventType: AudioEventType.prepared,
+          isPrepared: true,
+        ),
+      );
+      return;
     }
-    currentUrl = url;
+    _currentUrl = url;
 
-    stop();
+    release();
     recreateNode();
-    if (isPlaying) {
-      resume();
+    if (_isPlaying) {
+      await resume();
     }
   }
 
-  void setVolume(double volume) {
-    currentVolume = volume;
+  set volume(double volume) {
+    _currentVolume = volume;
     player?.volume = volume;
   }
 
-  void setBalance(double balance) {
-    stereoPanner?.pan.value = balance;
+  set balance(double balance) {
+    _stereoPanner?.pan.value = balance;
   }
 
-  void setPlaybackRate(double rate) {
-    currentPlaybackRate = rate;
+  set playbackRate(double rate) {
+    _currentPlaybackRate = rate;
     player?.playbackRate = rate;
   }
 
   void recreateNode() {
+    final currentUrl = _currentUrl;
     if (currentUrl == null) {
       return;
     }
 
-    final p = player = AudioElement(currentUrl);
+    final p = player = web.HTMLAudioElement();
+    p.preload = 'auto';
+    p.src = currentUrl;
     // As the AudioElement is created dynamically via script,
     // features like 'stereo panning' need the CORS header to be enabled.
     // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     p.crossOrigin = 'anonymous';
     p.loop = shouldLoop();
-    p.volume = currentVolume;
-    p.playbackRate = currentPlaybackRate;
+    p.volume = _currentVolume;
+    p.playbackRate = _currentPlaybackRate;
+
+    _setupStreams(p);
 
     // setup stereo panning
-    final audioContext = JsAudioContext();
+    final audioContext = web.AudioContext();
     final source = audioContext.createMediaElementSource(player!);
-    stereoPanner = audioContext.createStereoPanner();
-    source.connect(stereoPanner!);
-    stereoPanner?.connect(audioContext.destination);
+    _stereoPanner = audioContext.createStereoPanner();
+    source.connect(_stereoPanner!);
+    _stereoPanner?.connect(audioContext.destination);
 
-    playerPlaySubscription = p.onPlay.listen((_) {
-      streamsInterface.emitDuration(
-        playerId,
-        p.duration.fromSecondsToDuration(),
-      );
-    });
-    playerLoadedDataSubscription = p.onLoadedData.listen((_) {
-      streamsInterface.emitDuration(
-        playerId,
-        p.duration.fromSecondsToDuration(),
-      );
-    });
-    playerTimeUpdateSubscription = p.onTimeUpdate.listen((_) {
-      streamsInterface.emitPosition(
-        playerId,
-        p.currentTime.fromSecondsToDuration(),
-      );
-    });
-    playerSeekedSubscription = p.onSeeked.listen((_) {
-      streamsInterface.emitSeekComplete(playerId);
-    });
-    playerEndedSubscription = p.onEnded.listen((_) {
-      pausedAt = 0;
-      player?.currentTime = 0;
-      streamsInterface.emitComplete(playerId);
-    });
+    // Preload the source
+    p.load();
   }
 
-  bool shouldLoop() => currentReleaseMode == ReleaseMode.loop;
+  void _setupStreams(web.HTMLAudioElement p) {
+    _playerLoadedDataSubscription = p.onLoadedData.listen(
+      (_) {
+        eventStreamController.add(
+          const AudioEvent(
+            eventType: AudioEventType.prepared,
+            isPrepared: true,
+          ),
+        );
+        eventStreamController.add(
+          AudioEvent(
+            eventType: AudioEventType.duration,
+            duration: p.duration.fromSecondsToDuration(),
+          ),
+        );
+      },
+      onError: eventStreamController.addError,
+    );
+    _playerPlaySubscription = p.onPlay.listen(
+      (_) {
+        eventStreamController.add(
+          AudioEvent(
+            eventType: AudioEventType.duration,
+            duration: p.duration.fromSecondsToDuration(),
+          ),
+        );
+      },
+      onError: eventStreamController.addError,
+    );
+    _playerSeekedSubscription = p.onSeeked.listen(
+      (_) {
+        eventStreamController.add(
+          const AudioEvent(eventType: AudioEventType.seekComplete),
+        );
+      },
+      onError: eventStreamController.addError,
+    );
+    _playerEndedSubscription = p.onEnded.listen(
+      (_) {
+        if (_currentReleaseMode == ReleaseMode.release) {
+          release();
+        } else {
+          stop();
+        }
+        eventStreamController.add(
+          const AudioEvent(eventType: AudioEventType.complete),
+        );
+      },
+      onError: eventStreamController.addError,
+    );
+    _playerErrorSubscription = p.onError.listen(
+      (_) {
+        String platformMsg;
+        if (p.error != null) {
+          platformMsg = 'Failed to set source. For troubleshooting, see '
+              'https://github.com/bluefireteam/audioplayers/blob/main/troubleshooting.md';
+        } else {
+          platformMsg = 'Unknown web error. See details.';
+        }
+        eventStreamController.addError(
+          PlatformException(
+            code: 'WebAudioError',
+            message: platformMsg,
+            details: '${p.error?.runtimeType}: '
+                '${p.error?.message} (Code: ${p.error?.code})',
+          ),
+        );
+      },
+      onError: eventStreamController.addError,
+    );
+  }
 
-  void setReleaseMode(ReleaseMode releaseMode) {
-    currentReleaseMode = releaseMode;
+  bool shouldLoop() => _currentReleaseMode == ReleaseMode.loop;
+
+  set releaseMode(ReleaseMode releaseMode) {
+    _currentReleaseMode = releaseMode;
     player?.loop = shouldLoop();
   }
 
   void release() {
-    _cancel();
+    stop();
+    // Release `AudioElement` correctly (#966)
+    player?.src = '';
+    player?.remove();
     player = null;
-    stereoPanner = null;
+    _stereoPanner = null;
 
-    playerLoadedDataSubscription?.cancel();
-    playerLoadedDataSubscription = null;
-    playerTimeUpdateSubscription?.cancel();
-    playerTimeUpdateSubscription = null;
-    playerEndedSubscription?.cancel();
-    playerEndedSubscription = null;
-    playerSeekedSubscription?.cancel();
-    playerSeekedSubscription = null;
-    playerPlaySubscription?.cancel();
-    playerPlaySubscription = null;
+    _playerLoadedDataSubscription?.cancel();
+    _playerLoadedDataSubscription = null;
+    _playerEndedSubscription?.cancel();
+    _playerEndedSubscription = null;
+    _playerSeekedSubscription?.cancel();
+    _playerSeekedSubscription = null;
+    _playerPlaySubscription?.cancel();
+    _playerPlaySubscription = null;
+    _playerErrorSubscription?.cancel();
+    _playerErrorSubscription = null;
   }
 
-  void start(double position) {
-    isPlaying = true;
-    if (currentUrl == null) {
+  Future<void> start(double position) async {
+    _isPlaying = true;
+    if (_currentUrl == null) {
       return; // nothing to play yet
     }
     if (player == null) {
       recreateNode();
     }
-    player?.play();
     player?.currentTime = position;
+    await player?.play().toDart;
   }
 
-  void resume() {
-    start(pausedAt ?? 0);
+  Future<void> resume() async {
+    await start(_pausedAt ?? 0);
   }
 
   void pause() {
-    pausedAt = player?.currentTime as double?;
-    isPlaying = false;
+    // TODO(Gustl22): remove ignore, when web >= 1.0.0
+    // ignore: unnecessary_cast
+    _pausedAt = player?.currentTime as double?;
+    _isPlaying = false;
     player?.pause();
   }
 
   void stop() {
-    _cancel();
-    pausedAt = 0;
+    pause();
+    _pausedAt = 0;
     player?.currentTime = 0;
   }
 
@@ -159,16 +223,19 @@ class WrappedPlayer {
     final seekPosition = position / 1000.0;
     player?.currentTime = seekPosition;
 
-    if (!isPlaying) {
-      pausedAt = seekPosition;
+    if (!_isPlaying) {
+      _pausedAt = seekPosition;
     }
   }
 
-  void _cancel() {
-    isPlaying = false;
-    player?.pause();
-    if (currentReleaseMode == ReleaseMode.release) {
-      player = null;
-    }
+  void log(String message) {
+    eventStreamController.add(
+      AudioEvent(eventType: AudioEventType.log, logMessage: message),
+    );
+  }
+
+  Future<void> dispose() async {
+    release();
+    eventStreamController.close();
   }
 }
